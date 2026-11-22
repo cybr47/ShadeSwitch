@@ -21,7 +21,7 @@ final class NativePanels {
     private final Field qsDisabled, shadeDisabled, mode, initialY, changeSpot, intercepted, direction;
     private final Field touchSlop, headerLazy, header;
     private final Field status, detailOpening, detailShowing, detailClosing, customizing;
-    private final Method lazyValue, popOver;
+    private final Method lazyValue, popOver, handlerAccessor;
     private final Object undecided, down;
     private final WeakHashMap<View, HeaderArea> headerAreas = new WeakHashMap<>();
     // Touch-down hit-testing runs on the main thread only, so these scratch objects are reused
@@ -64,7 +64,21 @@ final class NativePanels {
         Class<?> handlerType = Class.forName("com.android.systemui.shade.PanelSlideEventHandler", false, loader);
         Class<?> directionType = Class.forName("com.android.systemui.shade.PanelSlideEventHandler$Direction", false, loader);
         Class<?> animatorState = Class.forName("com.android.systemui.qs.animator.QsAnimatorState", false, loader);
-        intercept = method(helperType, "onIntercept", MotionEvent.class);
+        Method getHandler;
+        Field storedHandler;
+        Method interceptTouch;
+        if (hasContainerIntercept(helperType)) {
+            getHandler = method(helperType, "getPanelSlideEventHandler");
+            storedHandler = null;
+            interceptTouch = method(helperType, "onIntercept", MotionEvent.class, boolean.class);
+        } else {
+            getHandler = null;
+            storedHandler = field(helperType, "panelSlideEventHandler");
+            interceptTouch = method(helperType, "onIntercept", MotionEvent.class);
+        }
+        handlerAccessor = getHandler;
+        handler = storedHandler;
+        intercept = interceptTouch;
         touch = method(helperType, "handleTouch", MotionEvent.class);
         initiate = method(handlerType, "initiateSlide", MotionEvent.class);
         pointerDeltas = method(handlerType, "slidePointerDeltas", MotionEvent.class);
@@ -76,7 +90,6 @@ final class NativePanels {
         enabled = field(helperType, "enabled");
         expanded = field(helperType, "panelExpanded");
         current = field(helperType, "currentState");
-        handler = field(helperType, "panelSlideEventHandler");
         panelRoot = field(helperType, "panelRootView");
         qsDisabled = field(helperType, "isQsDisabled");
         shadeDisabled = field(helperType, "isShadeDisabled");
@@ -105,8 +118,17 @@ final class NativePanels {
         return owner.get(nativeHandler);
     }
 
-    Object handler(Object helper) throws IllegalAccessException {
-        return handler.get(helper);
+    Object handler(Object helper) throws ReflectiveOperationException {
+        return handlerAccessor == null ? handler.get(helper) : handlerAccessor.invoke(helper);
+    }
+
+    static boolean hasContainerIntercept(Class<?> helper) {
+        try {
+            helper.getDeclaredMethod("onIntercept", MotionEvent.class, boolean.class);
+            return true;
+        } catch (NoSuchMethodException olderContract) {
+            return false;
+        }
     }
 
     boolean available(Object helper) throws ReflectiveOperationException {
@@ -152,7 +174,7 @@ final class NativePanels {
     boolean inHeader(Object helper, MotionEvent event) throws ReflectiveOperationException {
         View area = (View) panelRoot.get(helper);
         if (area == null) return false;
-        Object h = handler.get(helper);
+        Object h = handler(helper);
         View existingHeader = statusHeader(h);
         area.getLocationOnScreen(location);
         int panelTop = location[1];
@@ -242,13 +264,13 @@ final class NativePanels {
     }
 
 
-    private static Field field(Class<?> type, String name) throws NoSuchFieldException {
+    static Field field(Class<?> type, String name) throws NoSuchFieldException {
         Field value = type.getDeclaredField(name);
         value.setAccessible(true);
         return value;
     }
 
-    private static Method method(Class<?> type, String name, Class<?>... args) throws NoSuchMethodException {
+    static Method method(Class<?> type, String name, Class<?>... args) throws NoSuchMethodException {
         Method value = type.getDeclaredMethod(name, args);
         value.setAccessible(true);
         return value;

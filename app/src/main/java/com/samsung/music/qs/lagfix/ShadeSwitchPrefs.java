@@ -23,7 +23,7 @@ public final class ShadeSwitchPrefs {
     /** Hides the compact tile row on Samsung's Together notification panel. */
     public static final String KEY_HIDE_QUICK_QS_ROW = "hide_quick_qs_row";
 
-    /** Off ({@code false}) by default: selects stock Samsung horizontal swipe and animation. */
+    /** Off ({@code false}) by default: selects horizontal panel switching. */
     public static final boolean DEFAULT_VERTICAL_SWIPE = false;
 
     /** Switch label in ShadeSwitch settings. */

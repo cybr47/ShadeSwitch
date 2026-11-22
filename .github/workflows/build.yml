@@ -2,7 +2,7 @@ name: Build APKs
 
 on:
   push:
-    branches: [main, no-swipe-panel-switch, area-increase, v2]
+    branches: [main, no-swipe-panel-switch, area-increase, v2, ui-9.5]
   pull_request:
     branches: [main, no-swipe-panel-switch, area-increase]
   workflow_dispatch:
@@ -45,7 +45,7 @@ jobs:
             fi
           done
           exit "$missing"
-      - name: Tests, lint, debug and optimized release
+      - name: Tests, lint, debug and release
         run: ./gradlew --no-daemon :app:testDebugUnitTest :app:lintDebug :app:lintRelease :app:assembleDebug :app:assembleRelease
       - name: Sign both APKs with repository keystore
         if: github.event_name != 'pull_request'

@@ -1,26 +1,11 @@
-# ShadeSwitch v2
+# ShadeSwitch for One UI 9.5 motion
 
-A streamlined LSPosed module for **Samsung One UI 9 / Android 17**. This branch starts from the `area-increase` implementation and reuses the settings activity and Together-mode Quick QS row option from `tgtr`.
+ShadeSwitch is an LSPosed module for the Samsung notification shade and Quick Settings. The `ui-9.5` branch brings motion behavior observed in the `S948BXXU6ZZKN` SystemUI beta to the older One UI 9 panel implementation.
 
-## Features
+- **Separate mode** follows Samsung's native transition with wider diagonal capture, a short window to correct an initial downward gesture, and a release decision based on swipe velocity or distance. The fullscreen QS header and blur follow the expansion fraction with a 24 dp travel and an early header fade.
+- **Together mode** uses a damped 400 ms return from overdrag. **Hide Quick QS row** continues to hide the compact tiles independently.
+- **Vertical swipe to switch panels** replaces horizontal switching with the existing `v2` header and date row gesture. Restart SystemUI after changing this setting or the compact tile row setting.
 
-- **Vertical swipe to switch panels — OFF (default):** Leave Samsung's original **Separate mode** horizontal swipe recognizer, animator and release/fling behavior **untouched**. No GlassUI replacement, custom fade, manually increased frame count or custom touch interception. Native performance is not yet optimized or verified.
-- **Vertical swipe to switch panels — ON:** Use the **original `area-increase`** header/date-row downward pull to change between Notifications and Quick Settings in Separate mode, disabling horizontal panel switching while this option is selected. **Notification body and media card are not gesture start areas.** Samsung retains the actual drag/release animation.
-- **Together style → Hide Quick QS row:** Optional independent switch, ported from `tgtr`. Hides compact tiles without changing Samsung's full Quick Settings screen. It is effective in Together style and does not change Separate mode.
+Older panel layouts post constraint updates at the start and end of a switch and when the layout changes. Animator callbacks retain their order. The One UI 9.5 panel contract uses Samsung's implementation for motion.
 
-The settings UI uses LSPosed Remote Preferences; restart SystemUI after toggling options. Both switches are off by default on a new install. Existing settings with the same keys are retained when upgrading.
-
-## Source separation
-
-- Original `area-increase` files left unchanged: `NativePanels.java`, `NoSwipePanelHooks.java`, `SwipeSession.java`, and `InitialYGate.java`.
-- Ported from `tgtr`: `ShadeSwitchSettingsActivity.java`, `ShadeSwitchPrefs.java`, `TogetherQuickQsHooks.java`, and settings resources/configuration.
-- `SamsungMusicWavesHook.java` installs the **header-only** hooks **only when enabled** and the Together compact-row hook **only when enabled**. When vertical gestures are disabled, **no horizontal animation hooks are installed**.
-- **No legacy QS lagfix hooks or media-wave `stepX` adjustments are installed or bundled.** The original experimental sampling code remains only in older Git branches. The historical Android package ID (`com.samsung.music.qs.lagfix`) is retained for in-place upgrade compatibility, and the old Xposed entry class name is left unchanged to avoid needless entrypoint changes; neither name installs an additional hook.
-
-## Horizontal animation performance — baseline first
-
-The user reported frame jitter in Samsung's original horizontal panel switch, especially while the media card is shown. **v2 does not claim to fix that issue yet.** Frame rate is limited by display refresh and work per frame; fabricating additional interpolation frames cannot remove CPU/GPU stalls. An optimization should follow a device trace (ideally Perfetto with SurfaceFlinger FrameTimeline, SystemUI render thread and CPU scheduling), comparing transitions with and without media playback/card visible. Fix the observed bottleneck without replacing Samsung's animation.
-
-## Compatibility
-
-Built using Android API 37, Java 17, libxposed API 102 with the LSPosed service dependency. The module targets `com.android.systemui` on the validated One UI 9 build documented in `docs/ONEUI9-ANALYSIS.md`. This project modifies proprietary UI behavior; test on-device before relying on it.
+The module keeps the `com.samsung.music.qs.lagfix` package ID and libxposed API 102 scope. The older bindings were checked against the Galaxy S25 One UI 9 SystemUI APK. Device testing is needed to measure first-pull and transition frame times.

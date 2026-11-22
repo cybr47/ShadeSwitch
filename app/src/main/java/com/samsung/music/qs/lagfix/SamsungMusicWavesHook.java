@@ -4,17 +4,7 @@ import android.content.SharedPreferences;
 import android.util.Log;
 import io.github.libxposed.api.XposedModule;
 
-/**
- * ShadeSwitch v2: clean area-increase base and tgtr settings.
- *
- * OFF (default): Do not modify Samsung's native horizontal panel gestures,
- * animation fractions, view transforms or frame callbacks.
- *
- * ON: Install the original area-increase NoSwipePanelHooks (header-only
- * vertical pulls with horizontal panel switching disabled).
- *
- * Together-mode quick-QS row hiding is an independent preference.
- */
+/** ShadeSwitch entry point for the SystemUI process. */
 public final class SamsungMusicWavesHook extends XposedModule {
     private boolean targetProcess;
     private boolean installed;
@@ -31,13 +21,6 @@ public final class SamsungMusicWavesHook extends XposedModule {
     }
 
     @Override
-    public void onPackageLoaded(PackageLoadedParam param) {
-        if (BuildConfig.DEBUG && "com.android.systemui".equals(param.getPackageName())) {
-            debug("SystemUI package loaded: target=" + targetProcess, null);
-        }
-    }
-
-    @Override
     public void onPackageReady(PackageReadyParam param) {
         if (!targetProcess || installed
                 || !"com.android.systemui".equals(param.getPackageName())) {
@@ -49,25 +32,30 @@ public final class SamsungMusicWavesHook extends XposedModule {
 
         note("Loaded in SystemUI, module version " + BuildConfig.VERSION_NAME
                 + " (" + BuildConfig.BUILD_TYPE + ", gestures="
-                + (vertical ? "header-only-vertical" : "stock-horizontal")
+                + (vertical ? "header-only-vertical" : "horizontal")
                 + ", hideQuickQsRow=" + hideQuickQs + ")");
 
         ClassLoader loader = param.getClassLoader();
-        if (vertical) {
-            // EXACT original implementation from area-increase, not tgtr's
-            // notification-body interception or custom header animation.
-            NoSwipePanelHooks.install(this, loader);
-        } else {
-            note("Stock Samsung horizontal gestures/animation preserved (no transition hooks)");
-        }
+        installPanelMotion(loader, vertical);
+        if (vertical) NoSwipePanelHooks.install(this, loader);
+        if (hideQuickQs) TogetherQuickQsHooks.install(this, loader);
+    }
 
-        if (hideQuickQs) {
-            TogetherQuickQsHooks.install(this, loader);
+    private void installPanelMotion(ClassLoader loader, boolean vertical) {
+        try {
+            Class<?> split = loader.loadClass("com.android.systemui.shade.SecPanelSplitHelper");
+            if (NativePanels.hasContainerIntercept(split)) {
+                note("Using One UI 9.5 native panel motion");
+                return;
+            }
+            NativePanels.method(split, "onIntercept", android.view.MotionEvent.class);
+        } catch (ReflectiveOperationException | RuntimeException | LinkageError error) {
+            warn("Unsupported Samsung panel motion contract", error);
+            return;
         }
-
-        // The legacy area-increase wave-sampling hooks are deliberately omitted
-        // for a clean Samsung rendering baseline. Coarsening the waveform's
-        // spatial sampling does not increase display frame rate.
+        SplitMotionHooks.install(this, loader, !vertical);
+        QsOpenMotionHooks.install(this, loader);
+        QsDispatchHooks.install(this, loader);
     }
 
     private boolean readPreference(String key) {
