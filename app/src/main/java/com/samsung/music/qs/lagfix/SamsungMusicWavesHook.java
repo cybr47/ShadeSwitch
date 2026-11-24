@@ -37,6 +37,7 @@ public final class SamsungMusicWavesHook extends XposedModule {
 
         ClassLoader loader = param.getClassLoader();
         installPanelMotion(loader, vertical);
+        MediaWaveHooks.install(this, loader);
         if (vertical) NoSwipePanelHooks.install(this, loader);
         if (hideQuickQs) TogetherQuickQsHooks.install(this, loader);
     }

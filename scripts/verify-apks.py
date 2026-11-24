@@ -52,6 +52,7 @@ for index, argument in enumerate(sys.argv[1:]):
                             b"Split motion hooks installed",
                             b"Quick Settings opening motion hook installed",
                             b"Split header control timing hook installed",
+                            b"Media wave redraw control installed",
                             b"Split constraint coalescing installed",
                             b"Using One UI 9.5 native panel motion",
                             b"Panel gesture hooks installed",
