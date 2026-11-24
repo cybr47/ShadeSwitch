@@ -1,7 +1,7 @@
 package com.samsung.music.qs.lagfix;
 
-/** Tracks only recent changes in the shade and split-panel positions. */
-final class MediaMotionWindow {
+/** Tracks recent changes in the shade and split-panel positions. */
+final class PanelMotionWindow {
     private static final long FRAME_GAP_MS = 80;
 
     private float shadePosition, switchPosition;
@@ -28,5 +28,10 @@ final class MediaMotionWindow {
 
     boolean isMoving(long now) {
         return now < shadeUntil || now < switchUntil;
+    }
+
+    void reset() {
+        shadePosition = switchPosition = 0f;
+        shadeUntil = switchUntil = 0L;
     }
 }

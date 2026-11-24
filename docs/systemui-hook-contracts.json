@@ -38,6 +38,95 @@
       },
       "methods": []
     },
+    "Lcom/android/systemui/statusbar/notification/stack/NotificationStackScrollLayout;": {
+      "fields": {
+        "mChildrenUpdater": "Lcom/android/systemui/statusbar/notification/stack/NotificationStackScrollLayout$1;",
+        "mChildrenUpdateRequested": "Z",
+        "mNeedsAnimation": "Z",
+        "mAnimationRunning": "Z",
+        "mInHeadsUpPinnedMode": "Z",
+        "mHeadsUpAnimatingAway": "Z",
+        "mClearAllInProgress": "Z"
+      },
+      "methods": [
+        {
+          "name": "getPanelSplitHelper$1",
+          "descriptor": "()Lcom/android/systemui/shade/SecPanelSplitHelper;"
+        }
+      ]
+    },
+    "Lcom/android/systemui/statusbar/notification/stack/NotificationStackScrollLayout$1;": {
+      "fields": {
+        "this$0": "Lcom/android/systemui/statusbar/notification/stack/NotificationStackScrollLayout;"
+      },
+      "methods": [
+        {
+          "name": "onPreDraw",
+          "descriptor": "()Z"
+        }
+      ]
+    },
+    "Lcom/android/systemui/samsung/quicksetting/ui/tiles/MediaPlayerKt$$ExternalSyntheticLambda9;": {
+      "fields": {
+        "f$0": "Lcom/android/systemui/samsung/quicksetting/ui/media/QSMediaPlayerViewModel;",
+        "f$8": "Landroidx/compose/runtime/MutableState;"
+      },
+      "methods": [
+        {
+          "name": "invoke",
+          "descriptor": "(Ljava/lang/Object; Ljava/lang/Object; Ljava/lang/Object; Ljava/lang/Object;)Ljava/lang/Object;"
+        }
+      ]
+    },
+    "Landroidx/compose/runtime/SnapshotStateKt;": {
+      "fields": {},
+      "methods": [
+        {
+          "name": "derivedStateOf",
+          "descriptor": "(Landroidx/compose/runtime/SnapshotMutationPolicy; Lkotlin/jvm/functions/Function0;)Landroidx/compose/runtime/State;"
+        },
+        {
+          "name": "structuralEqualityPolicy",
+          "descriptor": "()Landroidx/compose/runtime/SnapshotMutationPolicy;"
+        }
+      ]
+    },
+    "Landroidx/compose/runtime/State;": {
+      "fields": {},
+      "methods": [
+        {
+          "name": "getValue",
+          "descriptor": "()Ljava/lang/Object;"
+        }
+      ]
+    },
+    "Lcom/android/systemui/qs/animator/SecQSImplAnimatorManager;": {
+      "fields": {},
+      "methods": [
+        {
+          "name": "onPanelExpansionChanged",
+          "descriptor": "(Lcom/android/systemui/shade/ShadeExpansionChangeEvent;)V"
+        },
+        {
+          "name": "onPanelTransitionStateChanged",
+          "descriptor": "(Lcom/android/systemui/shade/PanelTransitionStateChangeEvent;)V"
+        }
+      ]
+    },
+    "Lcom/android/systemui/shade/ShadeExpansionChangeEvent;": {
+      "fields": {
+        "fraction": "F"
+      },
+      "methods": []
+    },
+    "Lcom/android/systemui/shade/PanelTransitionStateChangeEvent;": {
+      "fields": {
+        "enabled": "Z",
+        "fraction": "F",
+        "state": "I"
+      },
+      "methods": []
+    },
     "Lcom/android/systemui/shade/SecPanelSplitHelper;": {
       "fields": {
         "enabled": "Z",

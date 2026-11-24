@@ -36,13 +36,14 @@ public final class SamsungMusicWavesHook extends XposedModule {
                 + ", hideQuickQsRow=" + hideQuickQs + ")");
 
         ClassLoader loader = param.getClassLoader();
-        installPanelMotion(loader, vertical);
-        MediaWaveHooks.install(this, loader);
+        PanelMotionWindow motion = PanelMovementHooks.install(this, loader);
+        installPanelMotion(loader, vertical, motion);
+        MediaWaveHooks.install(this, loader, motion);
         if (vertical) NoSwipePanelHooks.install(this, loader);
         if (hideQuickQs) TogetherQuickQsHooks.install(this, loader);
     }
 
-    private void installPanelMotion(ClassLoader loader, boolean vertical) {
+    private void installPanelMotion(ClassLoader loader, boolean vertical, PanelMotionWindow motion) {
         try {
             Class<?> split = loader.loadClass("com.android.systemui.shade.SecPanelSplitHelper");
             if (NativePanels.hasContainerIntercept(split)) {
@@ -64,6 +65,8 @@ public final class SamsungMusicWavesHook extends XposedModule {
         }
         QsOpenMotionHooks.installTogetherSpring(this, loader);
         QsDispatchHooks.install(this, loader);
+        HiddenShadeLayoutHooks.install(this, loader, motion);
+        QsMediaVisibilityHooks.install(this, loader);
     }
 
     private boolean readPreference(String key) {

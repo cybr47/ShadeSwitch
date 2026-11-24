@@ -8,6 +8,8 @@ ShadeSwitch is an LSPosed module for the Samsung notification shade and Quick Se
 
 During shade movement, ShadeSwitch defers the media player’s decorative wave redraws in both panels. The native playback position, artwork, touch controls and settled waveform still update normally.
 
+On the Galaxy S25 build `S931BXXUCDZIF`, the QS media pager updates its listening state at the visibility threshold. The slide still drives the native panel layers throughout the gesture. On the older panel contract, the hidden notification stack can defer its pending layout during a QS pull and apply it on the next eligible traversal. Visible notifications and active notification animations use Samsung’s normal layout path.
+
 Older panel layouts post constraint updates at the start and end of a switch and when the layout changes. Repeated intermediate slide samples are skipped. The final panel states and overdrag still run through Samsung’s callbacks. The One UI 9.5 panel contract uses Samsung's implementation for motion.
 
 The module keeps the `com.samsung.music.qs.lagfix` package ID and libxposed API 102 scope. The older bindings were checked against the Galaxy S25 One UI 9 SystemUI APK. SystemUI still renders the S25’s own view hierarchy and Compose scene. Device testing is needed to measure first-pull and transition frame times.

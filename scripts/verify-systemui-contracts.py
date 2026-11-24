@@ -24,11 +24,13 @@ with ZipFile(apk) as source:
             if contract is None:
                 continue
             fields = {field.get_name(): field.get_descriptor() for field in cls.get_fields()}
-            methods = {(method.get_name(), method.get_descriptor()) for method in cls.get_methods()}
+            methods = {(method.get_name(), method.get_descriptor().replace(" ", ""))
+                       for method in cls.get_methods()}
             for field, descriptor in contract["fields"].items():
                 assert fields.get(field) == descriptor, (cls.get_name(), field, descriptor)
             for method in contract["methods"]:
-                assert (method["name"], method["descriptor"]) in methods, (cls.get_name(), method)
+                signature = (method["name"], method["descriptor"].replace(" ", ""))
+                assert signature in methods, (cls.get_name(), method)
             print("PASS", cls.get_name())
         del dex
 assert not pending, list(pending)

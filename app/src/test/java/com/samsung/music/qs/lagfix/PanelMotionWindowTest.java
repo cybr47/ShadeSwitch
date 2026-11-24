@@ -5,10 +5,10 @@ import static org.junit.Assert.assertTrue;
 
 import org.junit.Test;
 
-public final class MediaMotionWindowTest {
+public final class PanelMotionWindowTest {
     @Test
     public void openingAndClosingStopAtTheirEndpoints() {
-        MediaMotionWindow motion = new MediaMotionWindow();
+        PanelMotionWindow motion = new PanelMotionWindow();
         motion.onShadePosition(0.2f, 10);
         assertTrue(motion.isMoving(11));
         motion.onShadePosition(1f, 20);
@@ -22,7 +22,7 @@ public final class MediaMotionWindowTest {
 
     @Test
     public void repeatedStationarySamplesDoNotKeepTheWaveDeferred() {
-        MediaMotionWindow motion = new MediaMotionWindow();
+        PanelMotionWindow motion = new PanelMotionWindow();
         motion.onShadePosition(0.5f, 10);
         motion.onShadePosition(0.5f, 70);
         assertTrue(motion.isMoving(89));
@@ -36,12 +36,24 @@ public final class MediaMotionWindowTest {
 
     @Test
     public void settlingOnePanelMotionLeavesTheOtherActive() {
-        MediaMotionWindow motion = new MediaMotionWindow();
+        PanelMotionWindow motion = new PanelMotionWindow();
         motion.onShadePosition(0.2f, 10);
         motion.onSwitchPosition(true, 0.4f, 11);
         motion.onShadePosition(1f, 20);
         assertTrue(motion.isMoving(21));
         motion.onSwitchPosition(false, 0.4f, 22);
         assertFalse(motion.isMoving(22));
+    }
+
+    @Test
+    public void resetClearsBothMotionsAndAcceptsTheNextSample() {
+        PanelMotionWindow motion = new PanelMotionWindow();
+        motion.onShadePosition(0.5f, 10);
+        motion.onSwitchPosition(true, 0.4f, 11);
+        motion.reset();
+        assertFalse(motion.isMoving(12));
+
+        motion.onShadePosition(0.5f, 13);
+        assertTrue(motion.isMoving(13));
     }
 }
