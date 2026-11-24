@@ -19,7 +19,7 @@ final class MediaWaveHooks {
     private static final int SWITCHING = 2;
 
     private final SamsungMusicWavesHook module;
-    private final Class<?> shadeWindow;
+    private final Class<?> shadeWindow, shadeRoot;
     private final Field waveView, wavePlaying, expansionFraction, splitFraction, splitEnabled, splitState;
     private final Method doFrame, expansionChanged, splitChanged;
     private final MediaMotionWindow motion = new MediaMotionWindow();
@@ -38,6 +38,8 @@ final class MediaWaveHooks {
         }
         doFrame = method(frameCallback, "doFrame", long.class);
         shadeWindow = loader.loadClass(SHADE + "NotificationShadeWindowView");
+        Class<?> windowController = loader.loadClass(SHADE + "NotificationShadeWindowControllerImpl");
+        shadeRoot = field(windowController, "mWindowRootView").getType();
 
         Class<?> manager = loader.loadClass("com.android.systemui.qs.animator.SecQSImplAnimatorManager");
         Class<?> expansionEvent = loader.loadClass(SHADE + "ShadeExpansionChangeEvent");
@@ -96,12 +98,13 @@ final class MediaWaveHooks {
             try {
                 Object callback = chain.getThisObject();
                 View view = (View) waveView.get(callback);
-                if (wavePlaying.getBoolean(view) && shadeWindow.isInstance(view.getRootView())
-                        && !view.isPressed()) {
-                    // Preserve the native callback lifetime. Omit this frame's invalidate()
-                    // so the view can reuse its display list during the shade animation.
-                    Choreographer.getInstance().postFrameCallback((Choreographer.FrameCallback) callback);
-                    return null;
+                if (wavePlaying.getBoolean(view) && !view.isPressed() && view.isAttachedToWindow()) {
+                    View root = view.getRootView();
+                    if (shadeRoot.isInstance(root) || shadeWindow.isInstance(root)) {
+                        // Preserve the callback lifetime while letting the view reuse its display list.
+                        Choreographer.getInstance().postFrameCallback((Choreographer.FrameCallback) callback);
+                        return null;
+                    }
                 }
             } catch (ReflectiveOperationException | RuntimeException error) {
                 fail(error);
