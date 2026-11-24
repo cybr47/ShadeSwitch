@@ -20,6 +20,7 @@ final class QsDispatchHooks {
     static void install(SamsungMusicWavesHook module, ClassLoader loader) {
         installDuplicateFractionGate(module, loader);
         installConstraintCoalescing(module, loader);
+        installDuplicateSlideGate(module, loader);
         installAnimatorFanout(module, loader);
     }
 
@@ -89,6 +90,47 @@ final class QsDispatchHooks {
         }
     }
 
+    private static void installDuplicateSlideGate(SamsungMusicWavesHook module, ClassLoader loader) {
+        try {
+            Class<?> manager = loader.loadClass("com.android.systemui.qs.animator.SecQSImplAnimatorManager");
+            Class<?> handler = loader.loadClass(SHADE + "PanelSlideEventHandler");
+            Class<?> direction = loader.loadClass(SHADE + "PanelSlideEventHandler$Direction");
+            Class<?> animatorState = loader.loadClass("com.android.systemui.qs.animator.QsAnimatorState");
+            Method slide = method(manager, "slide", float.class, float.class, direction, int.class);
+            Method initiate = method(handler, "initiateSlide", android.view.MotionEvent.class);
+            Field sliding = field(animatorState, "isSliding");
+            WeakHashMap<Object, SlideSample> samples = new WeakHashMap<>();
+            module.hook(initiate).setId("reset-slide-sample").intercept(chain -> {
+                if (Looper.myLooper() == Looper.getMainLooper()) samples.clear();
+                return chain.proceed();
+            });
+            module.hook(slide).setId("skip-unchanged-slide-sample").intercept(chain -> {
+                if (Looper.myLooper() != Looper.getMainLooper()) return chain.proceed();
+                Object owner = chain.getThisObject();
+                float progress = (float) chain.getArg(0);
+                float overdrag = (float) chain.getArg(1);
+                Object axis = chain.getArg(2);
+                if (!(progress > 0f && progress < 1f) || overdrag != 0f || axis == null
+                        || !sliding.getBoolean(null)) {
+                    samples.remove(owner);
+                    return chain.proceed();
+                }
+                int target = (int) chain.getArg(3);
+                SlideSample sample = samples.computeIfAbsent(owner, key -> new SlideSample());
+                if (sample.progress == progress && sample.axis == axis && sample.target == target) return null;
+
+                Object result = chain.proceed();
+                sample.progress = progress;
+                sample.axis = axis;
+                sample.target = target;
+                return result;
+            });
+            module.note("Split animator sample deduplication installed");
+        } catch (ReflectiveOperationException | RuntimeException | LinkageError error) {
+            module.warn("Unable to install split animator sample deduplication", error);
+        }
+    }
+
     private static void installAnimatorFanout(SamsungMusicWavesHook module, ClassLoader loader) {
         try {
             Class<?> manager = loader.loadClass("com.android.systemui.qs.animator.SecQSImplAnimatorManager");
@@ -110,6 +152,12 @@ final class QsDispatchHooks {
         } catch (ReflectiveOperationException | RuntimeException | LinkageError error) {
             module.warn("Unable to install Quick Settings animator fan-out", error);
         }
+    }
+
+    private static final class SlideSample {
+        float progress;
+        Object axis;
+        int target;
     }
 
     private record LayoutSize(int width, int height) {}

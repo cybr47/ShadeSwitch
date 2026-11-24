@@ -54,7 +54,14 @@ public final class SamsungMusicWavesHook extends XposedModule {
             return;
         }
         SplitMotionHooks.install(this, loader, !vertical);
-        QsOpenMotionHooks.install(this, loader);
+        try {
+            NativeTouchTracks tracks = new NativeTouchTracks(loader);
+            QsOpenMotionHooks.install(this, loader, tracks);
+            SplitHeaderMotionHooks.install(this, loader, tracks);
+        } catch (ReflectiveOperationException | RuntimeException | LinkageError error) {
+            warn("Unable to bind Samsung panel animation tracks", error);
+        }
+        QsOpenMotionHooks.installTogetherSpring(this, loader);
         QsDispatchHooks.install(this, loader);
     }
 

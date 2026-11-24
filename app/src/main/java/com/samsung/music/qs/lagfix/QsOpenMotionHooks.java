@@ -7,33 +7,33 @@ import android.animation.ValueAnimator;
 import android.view.View;
 import android.view.ViewParent;
 import android.view.animation.PathInterpolator;
-import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 
-/** Retimes Samsung's existing expansion tracks and Together-mode overdrag settle. */
+/** Uses the beta opening curves in the older animator's existing expansion callbacks. */
 final class QsOpenMotionHooks {
-    private static final int SAMPLES = 100;
     private static final String QS = "com.android.systemui.qs.";
     private static final String SHADE = "com.android.systemui.shade.";
 
     private final Field[] views;
-    private final Field[] tracks;
-    private final Field mode, enabled, detailShowing;
-    private final Method updateAnimators, isPopOver, isTablet, getView, addFloat, build;
-    private final Constructor<?> builder;
-    private final float[] alpha = new float[SAMPLES + 1];
-    private final float[] translation = new float[SAMPLES + 1];
+    private final Field headerAlpha, headerTranslation, unusedHeaderTrack, blurTrack;
+    private final Field mode, enabled, detailShowing, qs;
+    private final Method updateAnimators, isPopOver;
+    private final NativeTouchTracks tracks;
+    private final PathInterpolator easing = new PathInterpolator(0.42f, 0f, 0.58f, 1f);
 
-    private QsOpenMotionHooks(ClassLoader loader) throws ReflectiveOperationException {
+    private QsOpenMotionHooks(ClassLoader loader, NativeTouchTracks tracks)
+            throws ReflectiveOperationException {
+        this.tracks = tracks;
         Class<?> owner = loader.loadClass(QS + "animator.PanelSplitOpenAnimator");
         Class<?> split = loader.loadClass(SHADE + "SecPanelSplitHelper");
         Class<?> state = loader.loadClass(QS + "animator.QsAnimatorState");
-        Class<?> trackBuilder = loader.loadClass(QS + "TouchAnimator$Builder");
-        Class<?> view = loader.loadClass(QS + "animator.QSAnimView");
         updateAnimators = method(owner, "updateAnimators");
-        tracks = new Field[] {field(owner, "headerAnimator"), field(owner, "clockDateAnimator"),
-                field(owner, "buttonAnimator"), field(owner, "blurViewAnimator")};
+        qs = field(owner.getSuperclass(), "mQs");
+        headerAlpha = field(owner, "headerAnimator");
+        headerTranslation = field(owner, "clockDateAnimator");
+        unusedHeaderTrack = field(owner, "buttonAnimator");
+        blurTrack = field(owner, "blurViewAnimator");
         views = new Field[] {field(owner, "header"), field(owner, "clockDateContainer"),
                 field(owner, "buttonContainer"), field(owner, "blurParent"),
                 field(owner, "largeShadowView"), field(owner, "smallShadowView")};
@@ -41,24 +41,11 @@ final class QsOpenMotionHooks {
         detailShowing = field(state, "isDetailShowing");
         mode = field(owner, "secQsUiDisplayModeInteractor");
         isPopOver = method(mode.getType(), "isPopOverEnabled");
-        isTablet = method(mode.getType(), "isTablet");
-        getView = method(view, "getView");
-        builder = trackBuilder.getDeclaredConstructor();
-        builder.setAccessible(true);
-        addFloat = method(trackBuilder, "addFloat", Object.class, String.class, float[].class);
-        build = method(trackBuilder, "build");
-
-        PathInterpolator easing = new PathInterpolator(0.42f, 0f, 0.58f, 1f);
-        for (int i = 0; i <= SAMPLES; i++) {
-            float progress = (float) i / SAMPLES;
-            alpha[i] = easing.getInterpolation(Math.min(1f, progress / PanelMotion.HEADER_FADE_END));
-            translation[i] = easing.getInterpolation(progress) - 1f;
-        }
     }
 
-    static void install(SamsungMusicWavesHook module, ClassLoader loader) {
+    static void install(SamsungMusicWavesHook module, ClassLoader loader, NativeTouchTracks tracks) {
         try {
-            QsOpenMotionHooks hooks = new QsOpenMotionHooks(loader);
+            QsOpenMotionHooks hooks = new QsOpenMotionHooks(loader, tracks);
             module.hook(hooks.updateAnimators).setId("qs-open-timing").intercept(chain -> {
                 Object result = chain.proceed();
                 try {
@@ -72,54 +59,57 @@ final class QsOpenMotionHooks {
         } catch (ReflectiveOperationException | RuntimeException | LinkageError error) {
             module.warn("Unable to install Quick Settings opening motion", error);
         }
-        installTogetherSpring(module, loader);
     }
 
-    private void retime(Object animator) throws ReflectiveOperationException {
-        if (!enabled.getBoolean(null) || detailShowing.getBoolean(null)) return;
-        Object displayMode = mode.get(animator);
-        if ((boolean) isPopOver.invoke(displayMode) || (boolean) isTablet.invoke(displayMode)) return;
+    private void retime(Object owner) throws ReflectiveOperationException {
+        if (qs.get(owner) == null || !enabled.getBoolean(null) || detailShowing.getBoolean(null)
+                || (boolean) isPopOver.invoke(mode.get(owner))) return;
 
         Object[] wrappers = new Object[views.length];
         View[] targets = new View[views.length];
         for (int i = 0; i < views.length; i++) {
-            wrappers[i] = views[i].get(animator);
-            if (wrappers[i] != null) targets[i] = (View) getView.invoke(wrappers[i]);
+            wrappers[i] = views[i].get(owner);
+            targets[i] = tracks.view(wrappers[i]);
         }
 
-        // Build before swapping any of Samsung's tracks. The same position updates drive
-        // all the new keyframes, including when the finger pauses or reverses direction.
-        Object[] replacements = new Object[tracks.length];
+        Object alpha = tracks.builder(PanelMotion.HEADER_FADE_END, easing);
+        Object translation = tracks.builder(1f, easing);
+        boolean hasHeader = false;
         for (int i = 0; i < 3; i++) {
-            if (targets[i] == null || tracks[i].get(animator) == null) continue;
-            if (alreadyTargeted(targets, i, 0)) {
-                replacements[i] = build.invoke(builder.newInstance());
-                continue;
-            }
-            Object next = builder.newInstance();
-            boolean inheritsMotion = inheritsTransform(targets, i, 0);
-            addFloat.invoke(next, wrappers[i], "alpha", inheritsMotion ? new float[] {1f, 1f} : alpha);
-            addFloat.invoke(next, wrappers[i], "translationY", offsets(targets[i], inheritsMotion));
+            View view = targets[i];
+            if (view == null || alreadyTargeted(targets, i, 0)) continue;
+            boolean inherits = inheritsTransform(targets, i, 0, 3);
+            tracks.add(alpha, wrappers[i], "alpha", inherits ? 1f : 0f, 1f);
+            tracks.add(translation, wrappers[i], "translationY", offset(view, inherits), 0f);
             if (i != 0) {
-                addFloat.invoke(next, wrappers[i], "translationX", new float[] {0f, 0f});
-                addFloat.invoke(next, wrappers[i], "scaleX", new float[] {1f, 1f});
-                addFloat.invoke(next, wrappers[i], "scaleY", new float[] {1f, 1f});
+                tracks.add(translation, wrappers[i], "translationX", 0f, 0f);
+                tracks.add(translation, wrappers[i], "scaleX", 1f, 1f);
+                tracks.add(translation, wrappers[i], "scaleY", 1f, 1f);
             }
-            replacements[i] = build.invoke(next);
+            hasHeader = true;
         }
-        if (targets[3] != null && targets[4] != null && targets[5] != null
-                && tracks[3].get(animator) != null) {
-            Object next = builder.newInstance();
-            for (int i = 3; i < views.length; i++) {
+
+        Object blur = null;
+        if (targets[3] != null && targets[4] != null && targets[5] != null && blurTrack.get(owner) != null) {
+            Object builder = tracks.builder(1f, easing);
+            for (int i = 3; i < targets.length; i++) {
                 if (alreadyTargeted(targets, i, 3)) continue;
-                addFloat.invoke(next, wrappers[i], "translationY", offsets(targets[i],
-                        inheritsTransform(targets, i, 3)));
+                boolean inherits = inheritsTransform(targets, i, 3, targets.length);
+                tracks.add(builder, wrappers[i], "translationY", offset(targets[i], inherits), 0f);
             }
-            replacements[3] = build.invoke(next);
+            blur = tracks.build(builder);
         }
-        for (int i = 0; i < tracks.length; i++) {
-            if (replacements[i] != null) tracks[i].set(animator, replacements[i]);
+
+        // These slots all take the same incoming expansion fraction. Two tracks permit different
+        // spans for opacity and travel without sampling either curve or adding frame callbacks.
+        if (hasHeader) {
+            Object alphaTrack = tracks.build(alpha);
+            Object translationTrack = tracks.build(translation);
+            headerAlpha.set(owner, alphaTrack);
+            headerTranslation.set(owner, translationTrack);
+            unusedHeaderTrack.set(owner, null);
         }
+        if (blur != null) blurTrack.set(owner, blur);
     }
 
     private static boolean alreadyTargeted(View[] targets, int index, int first) {
@@ -129,24 +119,20 @@ final class QsOpenMotionHooks {
         return false;
     }
 
-    private static boolean inheritsTransform(View[] targets, int index, int first) {
+    private static boolean inheritsTransform(View[] targets, int index, int first, int end) {
         for (ViewParent parent = targets[index].getParent(); parent != null; parent = parent.getParent()) {
-            for (int i = first; i < index; i++) {
+            for (int i = first; i < end; i++) {
                 if (parent == targets[i]) return true;
             }
         }
         return false;
     }
 
-    private float[] offsets(View view, boolean inheritsMotion) {
-        if (inheritsMotion) return new float[] {0f, 0f};
-        float travel = PanelMotion.HEADER_TRAVEL_DP * view.getResources().getDisplayMetrics().density;
-        float[] values = new float[translation.length];
-        for (int i = 0; i < values.length; i++) values[i] = travel * translation[i];
-        return values;
+    private static float offset(View view, boolean inherits) {
+        return inherits ? 0f : -PanelMotion.HEADER_TRAVEL_DP * view.getResources().getDisplayMetrics().density;
     }
 
-    private static void installTogetherSpring(SamsungMusicWavesHook module, ClassLoader loader) {
+    static void installTogetherSpring(SamsungMusicWavesHook module, ClassLoader loader) {
         try {
             Class<?> panel = loader.loadClass(SHADE + "NotificationPanelViewController");
             Class<?> split = loader.loadClass(SHADE + "SecPanelSplitHelper");

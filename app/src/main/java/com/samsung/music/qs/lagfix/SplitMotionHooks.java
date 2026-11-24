@@ -21,9 +21,9 @@ final class SplitMotionHooks {
 
     private final SamsungMusicWavesHook module;
     private final Method updateDirection, initiateSlide, handleTouch, slide, release, applyFling;
-    private final Method isPopOver, isReversed;
+    private final Method isPopOver;
     private final Field helper, direction, slop, intercepted, width, animator, fling, minVelocity;
-    private final Field mode, fraction, origin, overSlide, callback, sliding;
+    private final Field mode, callback, sliding;
     private final Object left, right, up, down;
     private final WeakHashMap<Object, Float> offsets = new WeakHashMap<>();
     private Object cancelingHelper;
@@ -53,10 +53,6 @@ final class SplitMotionHooks {
         minVelocity = field(fling.getType(), "mMinVelocityPxPerSecond");
         mode = field(split, "secQsUiDisplayModeInteractor");
         isPopOver = method(mode.getType(), "isPopOverEnabled");
-        isReversed = method(split, "isReversed");
-        fraction = field(split, "draggedFraction");
-        origin = field(split, "stateOnDown");
-        overSlide = field(split, "onceOverSlide");
         callback = field(handler, "panelSlideEventCallback");
         sliding = field(state, "isSliding");
         left = field(directions, "LEFT").get(null);
@@ -118,31 +114,18 @@ final class SplitMotionHooks {
         float dy = (float) chain.getArg(1);
         try {
             Object split = helper.get(handler);
-            if (offsets.containsKey(split)) return null;
             int touchSlop = slop.getInt(handler);
             if (PanelMotion.favorsHorizontal(dx, dy, touchSlop) && !inPopOver(split)) {
                 Object next = dx < 0f ? left : right;
                 Object current = direction.get(handler);
-                if (current != down) {
-                    direction.set(handler, next);
+                if (current == down && !PanelMotion.withinAxisHandoff(dx, dy, touchSlop)) {
                     return null;
                 }
-                if (PanelMotion.withinAxisHandoff(dx, dy, touchSlop)) {
-                    if (!intercepted.getBoolean(handler)) {
-                        direction.set(handler, next);
-                        return null;
-                    }
-                    // The older slide helper interprets the sign against the panel on touch-down.
-                    // Convert the distance already on screen to the new axis using that sign.
-                    boolean positive = origin.getInt(split) == ((boolean) isReversed.invoke(split) ? 1 : 0);
-                    if (positive == (dx > 0f) && !overSlide.getBoolean(split)) {
-                        float offset = PanelMotion.axisHandoffOffset(dx, fraction.getFloat(split),
-                                width.getFloat(handler));
-                        direction.set(handler, next);
-                        offsets.put(split, offset);
-                        return null;
-                    }
+                if ((current == down || current == up) && intercepted.getBoolean(handler)) {
+                    offsets.put(split, PanelMotion.axisHandoffOffset(dx, dy));
                 }
+                direction.set(handler, next);
+                return null;
             }
         } catch (ReflectiveOperationException | RuntimeException error) {
             fail(error);

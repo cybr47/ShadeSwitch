@@ -17,9 +17,10 @@ public final class PanelMotionTest {
     }
 
     @Test
-    public void handoffKeepsTheVisibleDistanceOnEitherSide() {
-        assertEquals(-48f, -21f + PanelMotion.axisHandoffOffset(-21f, 0.04f, 1200f), 0.001f);
-        assertEquals(48f, 21f + PanelMotion.axisHandoffOffset(21f, 0.04f, 1200f), 0.001f);
+    public void handoffPreservesTheSignedDisplacement() {
+        assertEquals(26f, -21f + PanelMotion.axisHandoffOffset(-21f, 26f), 0f);
+        assertEquals(26f, 21f + PanelMotion.axisHandoffOffset(21f, 26f), 0f);
+        assertEquals(-17f, 22f + PanelMotion.axisHandoffOffset(22f, -17f), 0f);
     }
 
     @Test
@@ -29,19 +30,21 @@ public final class PanelMotionTest {
         assertEquals(1000f, PanelMotion.settleTarget(100f, 500f, 1000f, 400f, 1, false), 0f);
         assertEquals(0f, PanelMotion.settleTarget(800f, -600f, 1000f, 400f, 1, false), 0f);
         assertEquals(0f, PanelMotion.settleTarget(-800f, -600f, 1000f, 400f, -1, true), 0f);
-        assertEquals(0f, PanelMotion.settleTarget(-800f, 600f, 1000f, 400f, 1, false), 0f);
+        assertEquals(1000f, PanelMotion.settleTarget(-800f, 600f, 1000f, 400f, 1, false), 0f);
     }
 
     @Test
-    public void zeroVelocityTimeIsSymmetricAndBounded() {
+    public void zeroVelocityTimeUsesAbsoluteTravel() {
         assertEquals(260L, PanelMotion.settleDuration(-600f, 1000f));
         assertEquals(260L, PanelMotion.settleDuration(600f, 1000f));
-        assertEquals(300L, PanelMotion.settleDuration(1200f, 1000f));
+        assertEquals(320L, PanelMotion.settleDuration(1200f, 1000f));
     }
 
     @Test
     public void springSettlesWithoutOvershoot() {
         assertEquals(0f, PanelMotion.springBack(0f), 0f);
+        assertEquals(0.723013994f, PanelMotion.springBack(0.25f), 0.000001f);
+        assertEquals(0.963181044f, PanelMotion.springBack(0.5f), 0.000001f);
         float previous = 0f;
         for (int sample = 1; sample <= 100; sample++) {
             float value = PanelMotion.springBack(sample / 100f);

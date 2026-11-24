@@ -51,6 +51,7 @@ for index, argument in enumerate(sys.argv[1:]):
             for message in [b"Loaded in SystemUI, module version",
                             b"Split motion hooks installed",
                             b"Quick Settings opening motion hook installed",
+                            b"Split header control timing hook installed",
                             b"Split constraint coalescing installed",
                             b"Using One UI 9.5 native panel motion",
                             b"Panel gesture hooks installed",
